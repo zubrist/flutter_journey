@@ -12,14 +12,61 @@ class MyApp extends StatelessWidget{
   @override
   Widget build(BuildContext context) {
       return MaterialApp(
-        home: Scaffold(
-          appBar: AppBar(
-              backgroundColor: const Color.fromARGB(221, 255, 179, 64),
-              title: Text("Landing Page"),
-        
-      ),
-      ),
+        debugShowCheckedModeBanner: false,
+        home: HomeScreen2()
       );
   }
   
+}
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+              backgroundColor: const Color.fromARGB(221, 7, 166, 20),
+              title: Text("Landing Page"),
+    )
+    );
+    
+  }
+}
+
+
+class HomeScreen2 extends StatefulWidget {
+  const HomeScreen2({super.key});
+
+  @override
+  State<HomeScreen2> createState() => _HomeScreen2State();
+}
+
+class _HomeScreen2State extends State<HomeScreen2> {
+  String title ="Stateful Home";
+
+  String btnTxt = "Click ME";
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        backgroundColor: Colors.blueGrey,
+      ),
+
+      body: ElevatedButton(
+        onPressed:(){
+          setState(() {
+            title = "Stateless Widget";
+            print(title);
+            btnTxt = "dont click me";
+          });
+
+                  
+      
+
+        },
+        child: Text(btnTxt)),  
+    );
+  }
 }

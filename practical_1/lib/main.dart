@@ -14,6 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(fontFamily: 'family1'),
       home: const HomeScreen(),
 
     );
@@ -41,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("basic fltter App"),
+        title: const Text("basic fltter App"),
         backgroundColor: Colors.cyan[300],
       ),
       body: Center(
@@ -61,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 // decoration: TextDecoration.underline,
                                 // decorationColor: Colors.amberAccent,
                                 // decorationThickness: 2.0,
-                                // fontFamily: 'family1'
+                                fontFamily: 'family1',
                                 // shadows: [
                                 //   Shadow(
                                 //     color: Colors.black,
