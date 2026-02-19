@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:layout/screens/home/home_screen.dart';
 import 'package:layout/screens/home/home_screen2.dart';
+import 'package:layout/screens/home/rows_and_cols.dart';
 
 void main(){
   runApp( const MyApp());
@@ -13,7 +14,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      home: HomeScreen(),
+      home: RowsAndCols(),
       debugShowCheckedModeBanner:false,
     );
   }
