@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:layout/screens/home/home_screen.dart';
 import 'package:layout/screens/home/home_screen2.dart';
-import 'package:layout/screens/home/rows_and_cols.dart';
+import 'package:layout/screens/home/row_and_col.dart';
 
 void main(){
   runApp( const MyApp());
