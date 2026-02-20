@@ -1,10 +1,9 @@
 // Import Flutter material design package
 import 'package:flutter/material.dart';
 
-// Import audioplayers package for playing audio files
-import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'dart:io';
+// Use a small cross-platform audio controller with a web fallback
+import 'audio/player.dart';
+import 'audio/player_base.dart';
 
 // Main function – entry point of the Flutter application
 void main() => runApp(const MusicPlayerApp());
@@ -33,8 +32,8 @@ class MusicPlayerHome extends StatefulWidget {
 
 // State class that holds list of songs and playback logic
 class _MusicPlayerHomeState extends State<MusicPlayerHome> {
-  // Audio player instance from audioplayers package
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  // Audio controller (web uses AudioElement; other platforms use a stub)
+  final AudioControllerBase _audioPlayer = AudioControllerImpl();
 
   // List of song titles
   final List<String> _songTitles = <String>[
@@ -59,27 +58,9 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
   // Function to play song at given index
   Future<void> _playSong(int index) async {
     _currentIndex = index;
-
-    // Stop any currently playing audio before starting new one
+    // Stop previous and play the selected asset using the platform controller.
     await _audioPlayer.stop();
-
-    // Play audio from asset by writing it to a temporary file and playing that file.
-    // This avoids referring to Source classes that may not exist across audioplayers versions.
-    try {
-      final byteData = await rootBundle.load(_songPaths[index]);
-      final bytes = byteData.buffer.asUint8List();
-      final tempDir = Directory.systemTemp;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_songPaths[index].split('/').last}';
-      final file = await File('${tempDir.path}/$fileName').writeAsBytes(bytes, flush: true);
-      // Play from the local device file using DeviceFileSource
-      await _audioPlayer.play(DeviceFileSource(file.path));
-    } catch (e) {
-      // If this fails, print error and rethrow for the caller to handle
-      // ignore: avoid_print
-      print('Failed to play asset ${_songPaths[index]}: $e');
-      rethrow;
-    }
-
+    await _audioPlayer.playAsset(_songPaths[index]);
     setState(() {
       _isPlaying = true;
     });
