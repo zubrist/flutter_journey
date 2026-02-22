@@ -1,1 +1,0 @@
-This placeholder prevents the assets directory from being empty.

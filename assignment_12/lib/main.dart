@@ -1,210 +1,291 @@
+import 'dart:math';
+
+import 'package:audioplayers/audioplayers.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
 
-// needed for DateTime
-void main() => runApp(const ClockApp());
+void main() => runApp(const MusicPlayerApp());
 
-// kicks everything off
-class ClockApp extends StatelessWidget {
-  const ClockApp({super.key});
+class MusicPlayerApp extends StatelessWidget {
+  const MusicPlayerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Digital Clock',
+      title: 'Music Player',
       debugShowCheckedModeBanner: false,
-      home: const ClockHome(),
+      theme: ThemeData.dark(useMaterial3: true),
+      home: const MusicHome(),
     );
   }
 }
 
-// main screen — stateful because the clock ticks every second
-class ClockHome extends StatefulWidget {
-  const ClockHome({super.key});
+class MusicHome extends StatefulWidget {
+  const MusicHome({super.key});
 
   @override
-  State<ClockHome> createState() => _ClockHomeState();
+  State<MusicHome> createState() => _MusicHomeState();
 }
 
-class _ClockHomeState extends State<ClockHome> {
-  late DateTime _now;
-  late Timer _timer;
+class _MusicHomeState extends State<MusicHome> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  final List<Song> _playlist = [
+    const Song(
+      title: 'Sample Song',
+      artist: 'Local Demo',
+      assetPath: 'assets/audio/sample_song.mp3',
+    ),
+  ];
 
-  // pink or blue — starts pink
-  bool _isPink = true;
+  int _currentIndex = 0;
+  bool _isPlaying = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+  bool _isSeeking = false;
+
+  Song get _currentSong => _playlist[_currentIndex];
 
   @override
   void initState() {
     super.initState();
-    _now = DateTime.now();
-    // tick every second
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _now = DateTime.now());
-    });
+    _wirePlayerEvents();
+    _loadTrack();
   }
 
   @override
   void dispose() {
-    _timer.cancel(); // don't leak the timer
+    _audioPlayer.dispose();
     super.dispose();
   }
 
-  // formats hour into 12-hr with leading zero
-  String _formatHour(int h) {
-    final h12 = h % 12 == 0 ? 12 : h % 12;
-    return h12.toString().padLeft(2, '0');
+  void _wirePlayerEvents() {
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (!mounted) return;
+      setState(() => _isPlaying = state == PlayerState.playing);
+    });
+
+    _audioPlayer.onDurationChanged.listen((duration) {
+      if (!mounted) return;
+      setState(() => _duration = duration);
+    });
+
+    _audioPlayer.onPositionChanged.listen((position) {
+      if (!mounted || _isSeeking) return;
+      setState(() => _position = position);
+    });
+
+    _audioPlayer.onPlayerComplete.listen((_) => _handleNext());
   }
 
-  String _twoDigit(int n) => n.toString().padLeft(2, '0');
+  Future<void> _loadTrack({bool autoPlay = false}) async {
+    try {
+      final source = _currentSong.audioSource;
+      setState(() {
+        _duration = Duration.zero;
+        _position = Duration.zero;
+      });
+      await _audioPlayer.setSource(source);
+      if (autoPlay) {
+        await _audioPlayer.resume();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load ${_currentSong.title}: $error')),
+      );
+    }
+  }
 
-  // am or pm — simple
-  String get _period => _now.hour < 12 ? 'AM' : 'PM';
+  Future<void> _handlePlayPause() async {
+    if (_isPlaying) {
+      await _audioPlayer.pause();
+    } else {
+      await _audioPlayer.resume();
+    }
+  }
 
-  // HH:MM:SS
-  String get _timeString =>
-      '${_formatHour(_now.hour)}:${_twoDigit(_now.minute)}:${_twoDigit(_now.second)}';
+  Future<void> _handleNext() async {
+    if (_playlist.isEmpty || !mounted) return;
+    setState(() => _currentIndex = (_currentIndex + 1) % _playlist.length);
+    await _loadTrack(autoPlay: _isPlaying);
+  }
 
-  // DD-MM-YYYY
-  String get _dateString =>
-      '${_twoDigit(_now.day)}-${_twoDigit(_now.month)}-${_now.year}';
+  Future<void> _handlePrevious() async {
+    if (_playlist.isEmpty || !mounted) return;
+    setState(() =>
+        _currentIndex = (_currentIndex - 1 + _playlist.length) % _playlist.length);
+    await _loadTrack(autoPlay: _isPlaying);
+  }
+
+  Future<void> _seekTo(double milliseconds) async {
+    final target = Duration(milliseconds: milliseconds.round());
+    await _audioPlayer.seek(target);
+    setState(() => _position = target);
+  }
+
+  Future<void> _importFromDevice() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.audio,
+      allowMultiple: false,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.path == null) return;
+
+    setState(() {
+      final userSong = Song(
+        title: file.name,
+        artist: 'Device',
+        filePath: file.path,
+      );
+      _playlist.add(userSong);
+      _currentIndex = _playlist.length - 1;
+    });
+
+    if (!mounted) return;
+    await _loadTrack(autoPlay: true);
+  }
 
   @override
   Widget build(BuildContext context) {
-    // swap colors based on selection
-    final bg = _isPink
-        ? const Color(0xFFF8BBD0) // soft pink
-        : const Color(0xFFBBDEFB); // soft blue
-
-    final accent = _isPink
-        ? const Color(0xFFAD1457) // deep pink
-        : const Color(0xFF1565C0); // deep blue
+    final sliderMax = max(1, _duration.inMilliseconds.toDouble());
+    final sliderValue = min(sliderMax, max(0, _position.inMilliseconds.toDouble()));
 
     return Scaffold(
-      // app bar matches current theme
-      appBar: AppBar(
-        backgroundColor: accent,
-        centerTitle: true,
-        title: const Text(
-          'Digital Clock',
-          style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-      ),
-
-      body: AnimatedContainer(
-        duration: const Duration(milliseconds: 400), // smooth bg switch
-        color: bg,
-        child: Center(
+      backgroundColor: const Color(0xFF050A1A),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-
-              // clock card
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 36, vertical: 28),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: accent, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accent.withOpacity(0.25),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Music Player',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
                     ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // the big time display
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                  ),
+                  IconButton(
+                    onPressed: _importFromDevice,
+                    icon: const Icon(Icons.upload_file),
+                    tooltip: 'Load from device',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _NowPlayingCard(
+                song: _currentSong,
+                isPlaying: _isPlaying,
+                duration: _duration,
+                position: _position,
+              ),
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: Colors.deepPurpleAccent,
+                      thumbColor: Colors.deepPurpleAccent,
+                      overlayColor: Colors.deepPurpleAccent.withOpacity(0.3),
+                    ),
+                    child: Slider(
+                      min: 0,
+                      max: sliderMax,
+                      value: sliderValue,
+                      onChanged: (value) {
+                        setState(() {
+                          _position = Duration(milliseconds: value.round());
+                          _isSeeking = true;
+                        });
+                      },
+                      onChangeEnd: (value) {
+                        _isSeeking = false;
+                        _seekTo(value);
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _timeString,
-                          style: TextStyle(
-                            fontSize: 58,
-                            fontWeight: FontWeight.bold,
-                            color: accent,
-                            letterSpacing: 4,
-                            fontFeatures: const [
-                              // monospaced digits so it doesn't jitter
-                              FontFeature.tabularFigures()
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // AM / PM badge
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: accent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              _period,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18),
-                            ),
-                          ),
-                        ),
+                        Text(_formatDuration(_position)),
+                        Text(_formatDuration(_duration)),
                       ],
                     ),
-
-                    const SizedBox(height: 10),
-
-                    // date below the time
-                    Text(
-                      _dateString,
-                      style: TextStyle(
-                        fontSize: 22,
-                        color: accent.withOpacity(0.8),
-                        letterSpacing: 2,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-
-              const SizedBox(height: 48),
-
-              // colour picker row
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Theme:',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600),
+                  _ControlButton(
+                    icon: Icons.skip_previous,
+                    onPressed: _handlePrevious,
                   ),
-                  const SizedBox(width: 16),
-
-                  // Pink button
-                  _ThemeButton(
-                    label: 'Pink',
-                    color: const Color(0xFFAD1457),
-                    selected: _isPink,
-                    onTap: () => setState(() => _isPink = true),
-                  ),
-
                   const SizedBox(width: 12),
-
-                  // Blue button
-                  _ThemeButton(
-                    label: 'Blue',
-                    color: const Color(0xFF1565C0),
-                    selected: !_isPink,
-                    onTap: () => setState(() => _isPink = false),
+                  _ControlButton(
+                    icon: _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                    size: 72,
+                    onPressed: _handlePlayPause,
+                  ),
+                  const SizedBox(width: 12),
+                  _ControlButton(
+                    icon: Icons.skip_next,
+                    onPressed: _handleNext,
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Playlist',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    color: Colors.white12,
+                    child: ListView.separated(
+                      itemCount: _playlist.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final song = _playlist[index];
+                        final isActive = index == _currentIndex;
+                        return ListTile(
+                          onTap: () async {
+                            setState(() => _currentIndex = index);
+                            await _loadTrack(autoPlay: true);
+                          },
+                          tileColor:
+                              isActive ? Colors.deepPurpleAccent.withOpacity(0.3) : null,
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.deepPurpleAccent.withOpacity(0.3),
+                            child: const Icon(Icons.music_note, color: Colors.white),
+                          ),
+                          title: Text(song.title),
+                          subtitle: Text(song.artist),
+                          trailing: isActive && _isPlaying
+                              ? const Icon(Icons.equalizer, color: Colors.deepPurpleAccent)
+                              : null,
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -214,49 +295,145 @@ class _ClockHomeState extends State<ClockHome> {
   }
 }
 
-// reusable theme selection button
-class _ThemeButton extends StatelessWidget {
-  final String label;
-  final Color color;
-  final bool selected; // is this the active choice?
-  final VoidCallback onTap;
+class Song {
+  const Song({
+    required this.title,
+    required this.artist,
+    this.assetPath,
+    this.filePath,
+  })  : assert(assetPath != null || filePath != null,
+            'Either assetPath or filePath must be provided');
 
-  const _ThemeButton({
-    required this.label,
-    required this.color,
-    required this.selected,
-    required this.onTap,
+  final String title;
+  final String artist;
+  final String? assetPath;
+  final String? filePath;
+
+  AudioSource get audioSource {
+    if (filePath != null) return DeviceFileSource(filePath!);
+    if (assetPath != null) return AssetSource(assetPath!);
+    throw StateError('No source defined for $title');
+  }
+}
+
+String _formatDuration(Duration duration) {
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
+}
+
+class _NowPlayingCard extends StatelessWidget {
+  const _NowPlayingCard({
+    required this.song,
+    required this.isPlaying,
+    required this.duration,
+    required this.position,
   });
+
+  final Song song;
+  final bool isPlaying;
+  final Duration duration;
+  final Duration position;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? color : Colors.white,
-          border: Border.all(color: color, width: 2),
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: color.withOpacity(0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-              : [],
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E1B4B), Color(0xFF3A0CA3)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : color,
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.45),
+            blurRadius: 20,
+            offset: const Offset(0, 12),
           ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Row(
+        children: [
+          Container(
+            height: 90,
+            width: 90,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white24,
+            ),
+            child: const Icon(
+              Icons.album,
+              size: 42,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  song.title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  song.artist,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  isPlaying ? 'Now playing' : 'Paused',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white60,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ControlButton extends StatelessWidget {
+  const _ControlButton({
+    required this.icon,
+    required this.onPressed,
+    this.size = 56,
+  });
+
+  final IconData icon;
+  final VoidCallback onPressed;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(size),
+      child: Ink(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white10,
+        ),
+        child: Icon(
+          icon,
+          size: size * 0.6,
+          color: Colors.white,
         ),
       ),
     );

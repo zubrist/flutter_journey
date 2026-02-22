@@ -1,192 +1,291 @@
-// Import Flutter material design package
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 
-// Use a small cross-platform audio controller with a web fallback
-import 'audio/player.dart';
-import 'audio/player_base.dart';
+void main() {
+  runApp(const MyApp());
+}
 
-// Main function – entry point of the Flutter application
-void main() => runApp(const MusicPlayerApp());
-
-// Root widget of the app (stateless)
-class MusicPlayerApp extends StatelessWidget {
-  const MusicPlayerApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      title: 'Music Player',
-      home: MusicPlayerHome(), // Home screen widget
       debugShowCheckedModeBanner: false,
+      home: AudioPlayerScreen(),
     );
   }
 }
 
-// Main screen – stateful widget because music state changes dynamically
-class MusicPlayerHome extends StatefulWidget {
-  const MusicPlayerHome({super.key});
+class AudioPlayerScreen extends StatefulWidget {
+  const AudioPlayerScreen({super.key});
 
   @override
-  State<MusicPlayerHome> createState() => _MusicPlayerHomeState();
+  State<AudioPlayerScreen> createState() => _AudioPlayerScreenState();
 }
 
-// State class that holds list of songs and playback logic
-class _MusicPlayerHomeState extends State<MusicPlayerHome> {
-  // Audio controller (web uses AudioElement; other platforms use a stub)
-  final AudioControllerBase _audioPlayer = AudioControllerImpl();
+class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
+  late final AudioPlayer _player;
+  bool _isReady = false;
+  String? _errorMessage;
+  final String _songName = 'Sample Song';
 
-  // List of song titles
-  final List<String> _songTitles = <String>[
-    'Song 1',
-    'Song 2',
-    'Song 3',
-  ];
-
-  // Corresponding list of asset paths for the songs
-  final List<String> _songPaths = <String>[
-    'assets/audio/song1.mp3',
-    'assets/audio/song2.mp3',
-    'assets/audio/song3.mp3',
-  ];
-
-  // Index of the currently selected/playing song
-  int _currentIndex = 0;
-
-  // Flag to track whether a song is currently playing
-  bool _isPlaying = false;
-
-  // Function to play song at given index
-  Future<void> _playSong(int index) async {
-    _currentIndex = index;
-    // Stop previous and play the selected asset using the platform controller.
-    await _audioPlayer.stop();
-    await _audioPlayer.playAsset(_songPaths[index]);
-    setState(() {
-      _isPlaying = true;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _player = AudioPlayer();
+    _init();
   }
 
-  // Function to pause the current song
-  Future<void> _pauseSong() async {
-    await _audioPlayer.pause();
-    setState(() {
-      _isPlaying = false;
-    });
-  }
-
-  // Function to resume the paused song
-  Future<void> _resumeSong() async {
-    await _audioPlayer.resume();
-    setState(() {
-      _isPlaying = true;
-    });
-  }
-
-  // Function to play the next song in the list
-  Future<void> _playNext() async {
-    int nextIndex = _currentIndex + 1;
-    if (nextIndex >= _songPaths.length) {
-      nextIndex = 0; // Wrap around to first song
+  Future<void> _init() async {
+    try {
+      // For Flutter Web, use the direct asset URL path
+      await _player
+          .setUrl('assets/audio/sample_song.mp3')
+          .timeout(const Duration(seconds: 10));
+      if (mounted) {
+        setState(() {
+          _isReady = true;
+          _errorMessage = null;
+        });
+      }
+    } catch (e) {
+      // If asset fails, log the error and show an error state
+      print('Error loading audio: $e');
+      if (mounted) {
+        setState(() {
+          _isReady = true; // Still set ready to show error message
+          _errorMessage = 'Error loading audio: $e';
+        });
+      }
     }
-    await _playSong(nextIndex);
-  }
-
-  // Function to play the previous song in the list
-  Future<void> _playPrevious() async {
-    int prevIndex = _currentIndex - 1;
-    if (prevIndex < 0) {
-      prevIndex = _songPaths.length - 1; // Wrap to last song
-    }
-    await _playSong(prevIndex);
   }
 
   @override
   void dispose() {
-    // Release resources when widget is disposed
-    _audioPlayer.dispose();
+    _player.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Scaffold provides basic visual layout structure
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Music Player'),
+        title: const Text('Flutter Web Audio Player'),
       ),
-      body: Column(
-        children: [
-          // Expanded ListView to show available songs
-          Expanded(
-            child: ListView.builder(
-              itemCount: _songTitles.length,
-              itemBuilder: (BuildContext context, int index) {
-                final bool isSelected = index == _currentIndex;
-                return ListTile(
-                  title: Text(_songTitles[index]),
-                  leading: Icon(
-                    Icons.music_note,
-                    color: isSelected ? Colors.blue : Colors.grey,
+      body: Center(
+        child: !_isReady
+            ? const CircularProgressIndicator()
+            : _errorMessage != null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error, size: 48, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage ?? 'Unknown error',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _isReady = false;
+                            _errorMessage = null;
+                          });
+                          _init();
+                        },
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  )
+                : Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Music Banner
+                        Container(
+                          padding: const EdgeInsets.all(30),
+                          decoration: BoxDecoration(
+                            color: Colors.blueAccent,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.music_note,
+                                size: 80,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                _songName,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        // Player Controls and Progress
+                        StreamBuilder<PlayerState>(
+                          stream: _player.playerStateStream,
+                          builder: (context, snapshot) {
+                            final playerState = snapshot.data;
+                            final processingState = playerState?.processingState;
+                            final playing = playerState?.playing ?? false;
+
+                            if (processingState == ProcessingState.loading ||
+                                processingState == ProcessingState.buffering) {
+                              return const CircularProgressIndicator();
+                            }
+
+                            return Column(
+                              children: [
+                                // Progress Bar and Time
+                                StreamBuilder<Duration>(
+                                  stream: _player.positionStream,
+                                  builder: (context, snapshot) {
+                                    final position = snapshot.data ?? Duration.zero;
+                                    final duration =
+                                        _player.duration ?? Duration.zero;
+
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Progress Bar
+                                        LinearProgressIndicator(
+                                          value: duration.inMilliseconds > 0
+                                              ? position.inMilliseconds /
+                                                  duration.inMilliseconds
+                                              : 0,
+                                          minHeight: 6,
+                                          backgroundColor: Colors.grey[300],
+                                          valueColor:
+                                              const AlwaysStoppedAnimation<Color>(
+                                                Colors.blueAccent,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        // Time Display
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              _formatDuration(position),
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              _formatDuration(duration),
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 32),
+                                // Play/Pause with Next/Previous Buttons
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    // Previous Button (Skip Back 10s)
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        final currentPos = _player.position;
+                                        final newPos = currentPos.inSeconds > 10
+                                            ? Duration(
+                                                seconds:
+                                                    currentPos.inSeconds - 10)
+                                            : Duration.zero;
+                                        await _player.seek(newPos);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.all(12),
+                                        shape: const CircleBorder(),
+                                        backgroundColor: Colors.grey[400],
+                                      ),
+                                      child: const Icon(
+                                        Icons.skip_previous,
+                                        size: 28,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 20),
+                                    // Play/Pause Button
+                                    ElevatedButton(
+                                      onPressed: playing
+                                          ? _player.pause
+                                          : _player.play,
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.all(16),
+                                        shape: const CircleBorder(),
+                                        backgroundColor: Colors.blueAccent,
+                                      ),
+                                      child: Icon(
+                                        playing
+                                            ? Icons.pause
+                                            : Icons.play_arrow,
+                                        size: 40,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 20),
+                                    // Next Button (Skip Forward 10s)
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        final currentPos = _player.position;
+                                        final duration =
+                                            _player.duration ?? Duration.zero;
+                                        final newPos = currentPos.inSeconds <
+                                                duration.inSeconds - 10
+                                            ? Duration(
+                                                seconds:
+                                                    currentPos.inSeconds + 10)
+                                            : duration;
+                                        await _player.seek(newPos);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.all(12),
+                                        shape: const CircleBorder(),
+                                        backgroundColor: Colors.grey[400],
+                                      ),
+                                      child: const Icon(
+                                        Icons.skip_next,
+                                        size: 28,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                  selected: isSelected,
-                  onTap: () => _playSong(index), // Play tapped song
-                );
-              },
-            ),
-          ),
-
-          const Divider(),
-
-          // Now playing and control buttons
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              children: [
-                // Display current song title
-                Text(
-                  'Now Playing: ${_songTitles[_currentIndex]}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Row of control buttons: Previous, Play/Pause, Next
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      iconSize: 32,
-                      icon: const Icon(Icons.skip_previous),
-                      onPressed: _playPrevious,
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton(
-                      iconSize: 40,
-                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-                      onPressed: () {
-                        if (_isPlaying) {
-                          _pauseSong();
-                        } else {
-                          _resumeSong();
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton(
-                      iconSize: 32,
-                      icon: const Icon(Icons.skip_next),
-                      onPressed: _playNext,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 }
