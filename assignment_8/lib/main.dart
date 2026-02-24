@@ -40,31 +40,51 @@ class BiodataScreen extends StatelessWidget {
     );
   }
 
-  TableRow _tableHeader(List<String> titles) {
+  TableRow _tableHeader(List<String> titles, {List<TextAlign>? alignments}) {
     return TableRow(
       decoration: BoxDecoration(color: Colors.grey.shade300),
       children: titles
+          .asMap()
+          .entries
           .map(
-            (text) => Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                text,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
+            (entry) {
+              final text = entry.value;
+              final align = alignments != null && entry.key < alignments.length
+                  ? alignments[entry.key]
+                  : TextAlign.left;
+              return Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  text,
+                  textAlign: align,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              );
+            },
           )
           .toList(),
     );
   }
 
-  TableRow _tableRow(List<String> values) {
+  TableRow _tableRow(List<String> values, {List<TextAlign>? alignments}) {
     return TableRow(
       children: values
+          .asMap()
+          .entries
           .map(
-            (text) => Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(text),
-            ),
+            (entry) {
+              final text = entry.value;
+              final align = alignments != null && entry.key < alignments.length
+                  ? alignments[entry.key]
+                  : TextAlign.left;
+              return Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  text,
+                  textAlign: align,
+                ),
+              );
+            },
           )
           .toList(),
     );
@@ -88,6 +108,19 @@ class BiodataScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const educationalAlignments = [
+      TextAlign.left,
+      TextAlign.left,
+      TextAlign.center,
+      TextAlign.left,
+    ];
+    const professionalAlignments = [
+      TextAlign.left,
+      TextAlign.left,
+      TextAlign.left,
+      TextAlign.center,
+    ];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Biodata Profile'),
@@ -178,10 +211,20 @@ class BiodataScreen extends StatelessWidget {
                           'Board',
                           'Year',
                           'Percentage',
-                        ]),
-                        _tableRow(['Madhyamik', 'WBBSE', '2020', '87%']),
-                        _tableRow(['Higher Secondary', 'WBCHSE', '2022', '83%']),
-                        _tableRow(['Bachelor of Arts', 'University of North Bengal', '2025', 'In Progress']),
+                        ],
+                            alignments: educationalAlignments),
+                        _tableRow(
+                          ['Madhyamik', 'WBBSE', '2020', '87%'],
+                          alignments: educationalAlignments,
+                        ),
+                        _tableRow(
+                          ['Higher Secondary', 'WBCHSE', '2022', '83%'],
+                          alignments: educationalAlignments,
+                        ),
+                        _tableRow(
+                          ['Bachelor of Arts', 'University of North Bengal', '2025', 'In Progress'],
+                          alignments: educationalAlignments,
+                        ),
                       ],
                     ),
                   ],
@@ -206,15 +249,20 @@ class BiodataScreen extends StatelessWidget {
                         0: FlexColumnWidth(2),
                         1: FlexColumnWidth(1.5),
                         2: FlexColumnWidth(1.2),
+                        3: FlexColumnWidth(1),
                       },
                       children: [
                         _tableHeader([
                           'Institution',
                           'Course',
                           'Duration',
-                        ]),
-                        _tableRow(['Akash Institute', 'UI/UX Design', '2 Months']),
-                        _tableRow(['DreamWorks Studio', 'Digital Marketing', '1 Month']),
+                          'Grade',
+                        ],
+                            alignments: professionalAlignments),
+                        _tableRow(
+                          ['Akash Institute', 'UI/UX Design', '2 Months', 'A+'],
+                          alignments: professionalAlignments,
+                        ),
                       ],
                     ),
                   ],
