@@ -44,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         ),
       );
+      
       return;
     }
 
@@ -62,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : "$name is not eligible to vote";
 
     // age=>18 ? elugible : not eligible
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
