@@ -33,7 +33,7 @@ class _MusicHomeState extends State<MusicHome> {
     const Song(
       title: 'Sample Song',
       artist: 'Local Demo',
-      assetPath: 'assets/audio/sample_song.mp3',
+      assetPath: 'audio/sample_song.mp3',
     ),
   ];
 
@@ -149,8 +149,11 @@ class _MusicHomeState extends State<MusicHome> {
 
   @override
   Widget build(BuildContext context) {
-    final sliderMax = max(1, _duration.inMilliseconds.toDouble());
-    final sliderValue = min(sliderMax, max(0, _position.inMilliseconds.toDouble()));
+    final sliderMax = max(1.0, _duration.inMilliseconds.toDouble());
+    final sliderValue = min(
+      sliderMax,
+      max(0.0, _position.inMilliseconds.toDouble()),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFF050A1A),
@@ -309,7 +312,7 @@ class Song {
   final String? assetPath;
   final String? filePath;
 
-  AudioSource get audioSource {
+  Source get audioSource {
     if (filePath != null) return DeviceFileSource(filePath!);
     if (assetPath != null) return AssetSource(assetPath!);
     throw StateError('No source defined for $title');
